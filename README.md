@@ -1,3 +1,3 @@
 # EnsembleDistillation
 
-Code will be added upon manuscript acceptance
+Code will be added after manuscript acceptance
