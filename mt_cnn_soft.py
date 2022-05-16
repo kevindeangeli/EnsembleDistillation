@@ -14,14 +14,9 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument("r_target", help="Target Registry [0,1,2,3]", type=int)
-# args = parser.parse_args()
-# r_target = args.r_target
 r_target = 4
 EnsembleSize = 1000
-#model_dir = "//gpfs/alpine/med107/proj-shared/kevindeangeli/interRegistrySavedModels/destilationModels/DataWithID/R4_Ensemble/"
-model_dir = "//gpfs/alpine/med107/proj-shared/kevindeangeli/interRegistrySavedModels/destilationModels/DataWithID/R4_Ensemble/"
+model_dir = "SaveModels/"
 scores_dir = "results/" + "R" + str(r_target) + "/student/"
 model_name = "Student" + str(EnsembleSize) + str(rank)
 load_model_name = "ensemble1000"
@@ -29,33 +24,12 @@ load_model_name = "ensemble1000"
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
-
 if rank == 0:
     if not os.path.exists(scores_dir):
         os.makedirs(scores_dir)
-#
-# if not os.path.exists(model_dir):
-#     os.makedirs(model_dir)
-
-#scores_dir = "results/"
-
-
-#student_models = [0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 14]
-
-if rank == 0:
-    rank=8
-elif rank == 1:
-    rank = 10
-elif rank == 2:
-    rank=13
-else:
-    rank = rank+12
 
 
 def run_cnn(
-        maxlen = 1500,
-        wv_len = 300,
-        epochs = 100,
         filter_k1 = 3,
         filter_k2 = 3,
         num_filters = 300,
@@ -74,27 +48,11 @@ def run_cnn(
         filter_sizes.append( k )
         n_filters.append( num_filters )
 
+    train_x, train_y, val_x, val_y, test_x, test_y, ood_x, ood_y = loadData(r_target, print_shapes=True)
 
-
-    #train_x, train_y, val_x, val_y, test_x, test_y, unseen_x, unseen_y = loadAllTasks(r_target,print_shapes=True)
-    train_x, train_y, val_x, val_y, test_x, test_y, unseen_x, unseen_y = loadAllTaskNoID(r_target)
-
-    # prop = 0.1
-    # propX = int(prop * len(train_x))
-    # propXT = int(prop * len(test_x))
-    # propXV = int(prop * len(val_x))
-    #
-    # train_x = train_x[0:propX]
-    # val_x = val_x[0:propXV]
-    # test_x = test_x[0:propXT]
-    # train_y = train_y[0:propX]
-    # val_y = val_y[0:propXV]
-    # test_y = test_y[0:propXT]
 
     # binarize labels
-    NUM_CLASES_TASK = [70, 327, 7, 645, 4]
-    num_classes = NUM_CLASES_TASK
-    #num_classes = [ 4, 639, 7, 70, 326 ]
+    num_classes = [70, 327, 7, 645, 4]
 
     val_bin_y = []
     for t in range( len( num_classes ) ):
@@ -144,7 +102,6 @@ def run_cnn(
     cnn.compile( loss= "categorical_crossentropy", optimizer= 'adam', metrics=[ "acc" ] )
 
     print( cnn.summary() )
-
     validation_data = ({'Input': np.array(val_x)},
                            {'Dense0': val_bin_y[0],
                             'Dense1': val_bin_y[1],
@@ -152,9 +109,6 @@ def run_cnn(
                             'Dense3': val_bin_y[3],
                             'Dense4': val_bin_y[4],
                             })
-
-
-
 
     ret = cnn.fit( x= np.array( train_x ),
                  y= train_soft,
@@ -188,7 +142,7 @@ def run_cnn(
     data = np.zeros(shape=(1,  len(num_classes)*2))
     data = np.vstack((data, micMac))
 
-    #Calculate unseen:
+    #Calculate OOD:
     micMac= []
     preds_probs = unseen_pred
     for t in range(len(num_classes)):
@@ -230,19 +184,8 @@ def run_cnn(
                                 'Be_ValLoss'])
     df0.to_csv(scores_dir + model_name + str(rank) + "_loss.csv")
 
-    pred = [val_pred, test_pred, unseen_pred]
-    true = [val_y, test_y, unseen_y]
-    evaluationMetrics.find97AccThresholdTASK(pred, true, saveDir=model_name)
-    #evaluationMetrics.makeSitePredHistogram(unseen_pred, saveDir=model_name)
-
-
-
-
-    
-    
 
 
 if __name__ == "__main__":
-    # main()
     run_cnn()
 
